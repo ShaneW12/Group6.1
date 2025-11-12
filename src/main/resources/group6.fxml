@@ -4,7 +4,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<VBox spacing="10" xmlns:fx="http://javafx.com/fxml" fx:controller="MapController" alignment="CENTER" style="-fx-padding: 20;">
+<VBox spacing="10" xmlns:fx="http://javafx.com/fxml" fx:controller="Group6_otherCode.MapController" alignment="CENTER" style="-fx-padding: 20;">
     <HBox spacing="10">
         <TextField fx:id="originField" promptText="Enter origin location"/>
         <TextField fx:id="destinationField" promptText="Enter destination location"/>
