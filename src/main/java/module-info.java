@@ -19,6 +19,9 @@ module brennan.transportauditlogin {
     // Logger requirement (from pom.xml)
     requires org.slf4j.simple; // <-- Added: For the SLF4J logger
 
+    // NEW: For sending the password check
+    requires java.net.http;
+
     // This allows JavaFX FXML to access your controller classes
     opens brennan.transportauditlogin to javafx.fxml;
 
