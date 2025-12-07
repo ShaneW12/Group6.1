@@ -150,6 +150,60 @@ public class LoginController {
             showAlert(Alert.AlertType.ERROR, "Error", "Could not open registration page.");
         }
     }
+    /**
+     * Called when the user clicks the "Forgot Password?" link.
+     */
+    @FXML
+    protected void onForgotPasswordClick() {
+        String email = emailField.getText();
+
+        if (email.isEmpty()) {
+            showAlert(Alert.AlertType.WARNING, "Forgot Password", "Please enter your email address in the box above, then click this button again.");
+            return;
+        }
+
+        try {
+            boolean success = sendPasswordResetEmail(email);
+            if (success) {
+                showAlert(Alert.AlertType.INFORMATION, "Email Sent", "If an account exists for " + email + ", a password reset link has been sent.");
+            } else {
+                showAlert(Alert.AlertType.ERROR, "Error", "Could not send reset email. Please check the email address.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred.");
+        }
+    }
+
+    /**
+     * Sends a password reset email using the Firebase REST API.
+     */
+    private boolean sendPasswordResetEmail(String email) throws IOException, InterruptedException {
+        // 1. Create the JSON payload
+        // requestType: "PASSWORD_RESET" tells Firebase to send the email
+        String jsonPayload = String.format(
+                "{\"requestType\":\"PASSWORD_RESET\",\"email\":\"%s\"}",
+                email
+        );
+
+        // 2. Build the request
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=" + FIREBASE_WEB_API_KEY))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                .build();
+
+        // 3. Send and check response
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() == 200) {
+            System.out.println("Reset email sent successfully.");
+            return true;
+        } else {
+            System.out.println("Failed to send reset email: " + response.body());
+            return false;
+        }
+    }
 
     private void showAlert(Alert.AlertType alertType, String title, String message) {
         Alert alert = new Alert(alertType);
