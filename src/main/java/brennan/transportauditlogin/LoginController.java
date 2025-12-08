@@ -7,7 +7,6 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
 import com.google.firebase.cloud.FirestoreClient;
-import com.google.gson.Gson; // Import Gson
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -16,27 +15,51 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
 import java.io.IOException;
-import java.net.URI; // Import new HTTP classes
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.Map;
 
 public class LoginController {
 
-    //FIREBASE WEB API KEY HERE ---
+    // --- PASTE YOUR FIREBASE WEB API KEY HERE ---
     private static final String FIREBASE_WEB_API_KEY = "AIzaSyBlyVFqxTv9UU_OQWyKag1sMsZelaTV9WQ";
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final Gson gson = new Gson();
 
-    @FXML
-    private TextField emailField;
-    @FXML
-    private PasswordField passwordField;
+    @FXML private GridPane rootPane; // Used for the background image
+    @FXML private TextField emailField;
+    @FXML private PasswordField passwordField;
+
+    /**
+     * Initializes the controller class. This method is automatically called
+     * after the fxml file has been loaded.
+     */
+    public void initialize() {
+        try {
+            // Load the background image
+            // We use the absolute path "/" to ensure Maven finds it in resources
+            String imagePath = getClass().getResource("/taxi.jpg").toExternalForm();
+            Image image = new Image(imagePath);
+
+            BackgroundSize backgroundSize = new BackgroundSize(100, 100, true, true, true, true);
+            BackgroundImage backgroundImage = new BackgroundImage(image,
+                    BackgroundRepeat.NO_REPEAT,
+                    BackgroundRepeat.NO_REPEAT,
+                    BackgroundPosition.CENTER,
+                    backgroundSize);
+
+            rootPane.setBackground(new Background(backgroundImage));
+
+        } catch (Exception e) {
+            System.err.println("Warning: Could not load background image 'taxi.jpg'. Check the file location.");
+        }
+    }
 
     @FXML
     protected void onLoginButtonClick() {
@@ -49,99 +72,68 @@ public class LoginController {
         }
 
         try {
-            // --- NEW PASSWORD CHECK ---
-            // Step 1: Verify the password using the REST API.
+            // 1. Verify the password using the REST API
             if (!verifyPassword(email, password)) {
                 showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid email or password.");
-                passwordField.clear(); // Clear password on failure
+                passwordField.clear();
                 return;
             }
 
-            // --- OLD CODE (MODIFIED) ---
-            // Step 2: If password is correct, get user's *role* from Firestore.
-            // We use the Admin SDK for this part.
+            // 2. Fetch User Role from Firestore (using Admin SDK)
             System.out.println("Password verified. Fetching user role...");
             UserRecord userRecord = FirebaseAuth.getInstance().getUserByEmail(email);
 
             Firestore db = FirestoreClient.getFirestore();
             ApiFuture<DocumentSnapshot> future = db.collection("users").document(userRecord.getUid()).get();
-            DocumentSnapshot document = future.get(); // Waits for the data
+            DocumentSnapshot document = future.get();
 
-            String username = "N/A";
             String role = "N/A";
-
             if (document.exists()) {
-                username = document.getString("username");
                 role = document.getString("role");
             }
 
-            // Step 3: Show success
-            showAlert(Alert.AlertType.INFORMATION, "Login Successful",
-                    "Welcome, " + username + "!\nYour role is: " + role);
-
-            // Clear fields and move to next screen (or close)
-            emailField.clear();
-            passwordField.clear();
-
-            // TODO: Add code here to switch to your main application scene
+            // 3. Handle Role Redirection
+            if ("Manager".equalsIgnoreCase(role)) {
+                // Open Manager Dashboard
+                openManagerDashboard();
+            } else {
+                // Driver or other role
+                showAlert(Alert.AlertType.INFORMATION, "Login Successful",
+                        "Welcome! Driver interface is coming soon.\nRole: " + role);
+            }
 
         } catch (FirebaseAuthException e) {
-            // This can still fail if the user exists in Auth but not Firestore
-            System.err.println("Error fetching user data: " + e.getMessage());
-            showAlert(Alert.AlertType.ERROR, "Login Failed", "User not found in database.");
+            System.err.println("Firebase Auth Error: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, "Login Failed", "User not found or database error.");
         } catch (Exception e) {
-            // This catches other errors, like no internet connection
             e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred.");
+            showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred.\n" + e.getMessage());
         }
     }
 
-    /**
-     * Verifies a user's email and password against the Firebase Auth REST API.
-     *
-     * @param email    The user's email.
-     * @param password The user's password.
-     * @return true if the login is successful, false otherwise.
-     */
-    private boolean verifyPassword(String email, String password) throws IOException, InterruptedException {
-        // 1. Create the JSON request body
-        String jsonPayload = String.format(
-                "{\"email\":\"%s\",\"password\":\"%s\",\"returnSecureToken\":true}",
-                email, password
-        );
+    private void openManagerDashboard() {
+        try {
+            // Load the dashboard FXML
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/manager-dashboard.fxml"));
 
-        // 2. Create the web request
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + FIREBASE_WEB_API_KEY))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
-                .build();
+            // Set the scene size larger for the dashboard (900x600)
+            Scene scene = new Scene(fxmlLoader.load(), 900, 600);
 
-        // 3. Send the request and get the response
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            // Get the current stage (window)
+            Stage stage = (Stage) emailField.getScene().getWindow();
+            stage.setScene(scene);
+            stage.centerOnScreen(); // Center the new larger window
 
-        // 4. Check the result
-        // A 200 "OK" status means the email and password were correct.
-        if (response.statusCode() == 200) {
-            System.out.println("Password authentication successful.");
-            // You can also get the user's token from the response if needed:
-            // Map<String, Object> responseMap = gson.fromJson(response.body(), Map.class);
-            // String idToken = (String) responseMap.get("idToken");
-            return true;
-        } else {
-            // Any other status (like 400) means invalid credentials
-            System.out.println("Password authentication failed. Status: " + response.statusCode());
-            System.out.println("Response: " + response.body());
-            return false;
+        } catch (IOException e) {
+            e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Navigation Error", "Could not load the Manager Dashboard.");
         }
     }
-
 
     @FXML
     protected void onRegisterButtonClick(ActionEvent event) {
-        // This method is unchanged, but make sure the path is correct
         try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/register-view.fxml")); // Must have '/'
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/register-view.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 450, 400);
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
             stage.setScene(scene);
@@ -150,24 +142,25 @@ public class LoginController {
             showAlert(Alert.AlertType.ERROR, "Error", "Could not open registration page.");
         }
     }
-    /**
-     * Called when the user clicks the "Forgot Password?" link.
-     */
+
     @FXML
     protected void onForgotPasswordClick() {
         String email = emailField.getText();
 
         if (email.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Forgot Password", "Please enter your email address in the box above, then click this button again.");
+            showAlert(Alert.AlertType.WARNING, "Forgot Password",
+                    "Please enter your email address in the box above, then click this button again.");
             return;
         }
 
         try {
             boolean success = sendPasswordResetEmail(email);
             if (success) {
-                showAlert(Alert.AlertType.INFORMATION, "Email Sent", "If an account exists for " + email + ", a password reset link has been sent.");
+                showAlert(Alert.AlertType.INFORMATION, "Email Sent",
+                        "If an account exists for " + email + ", a password reset link has been sent.");
             } else {
-                showAlert(Alert.AlertType.ERROR, "Error", "Could not send reset email. Please check the email address.");
+                showAlert(Alert.AlertType.ERROR, "Error",
+                        "Could not send reset email. Please check the email address.");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -175,34 +168,41 @@ public class LoginController {
         }
     }
 
-    /**
-     * Sends a password reset email using the Firebase REST API.
-     */
+    // --- HELPER METHODS ---
+
+    private boolean verifyPassword(String email, String password) throws IOException, InterruptedException {
+        String jsonPayload = String.format(
+                "{\"email\":\"%s\",\"password\":\"%s\",\"returnSecureToken\":true}",
+                email, password
+        );
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + FIREBASE_WEB_API_KEY))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        // 200 OK means password is correct
+        return response.statusCode() == 200;
+    }
+
     private boolean sendPasswordResetEmail(String email) throws IOException, InterruptedException {
-        // 1. Create the JSON payload
-        // requestType: "PASSWORD_RESET" tells Firebase to send the email
         String jsonPayload = String.format(
                 "{\"requestType\":\"PASSWORD_RESET\",\"email\":\"%s\"}",
                 email
         );
 
-        // 2. Build the request
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=" + FIREBASE_WEB_API_KEY))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                 .build();
 
-        // 3. Send and check response
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode() == 200) {
-            System.out.println("Reset email sent successfully.");
-            return true;
-        } else {
-            System.out.println("Failed to send reset email: " + response.body());
-            return false;
-        }
+        return response.statusCode() == 200;
     }
 
     private void showAlert(Alert.AlertType alertType, String title, String message) {

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="brennan.transportauditlogin.ManagerDashboardController">
+
+    <top>
+        <VBox spacing="20" style="-fx-background-color: #f4f4f4; -fx-padding: 20;">
+            <Label text="Manager Dashboard" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
+
+            <HBox spacing="20">
+                <VBox style="-fx-background-color: white; -fx-padding: 15; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 0); -fx-background-radius: 5;">
+                    <Label text="Total Expenses" textFill="#777777"/>
+                    <Label fx:id="totalCostLabel" text="\$0.00" style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
+                </VBox>
+                <VBox style="-fx-background-color: white; -fx-padding: 15; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 0); -fx-background-radius: 5;">
+                    <Label text="Pending Approvals" textFill="#777777"/>
+                    <Label fx:id="pendingCountLabel" text="0" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: orange;"/>
+                </VBox>
+                <VBox style="-fx-background-color: white; -fx-padding: 15; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 0); -fx-background-radius: 5;">
+                    <Label text="Total Mileage" textFill="#777777"/>
+                    <Label fx:id="totalMileageLabel" text="0 mi" style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
+                </VBox>
+            </HBox>
+        </VBox>
+    </top>
+
+    <center>
+        <VBox spacing="10" style="-fx-padding: 20;">
+
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <DatePicker fx:id="filterDate" promptText="Filter by Date"/>
+                <ComboBox fx:id="filterType" promptText="Expense Type" />
+                <Button text="Apply Filters" onAction="#loadData"/>
+                <Button text="Reset" onAction="#resetFilters"/>
+                <Button text="Generate Test Data" onAction="#generateTestData" style="-fx-background-color: #ddd;"/>
+            </HBox>
+
+            <TableView fx:id="expenseTable" VBox.vgrow="ALWAYS">
+                <columns>
+                    <TableColumn fx:id="colEmployee" text="Employee" prefWidth="150"/>
+                    <TableColumn fx:id="colDate" text="Date" prefWidth="100"/>
+                    <TableColumn fx:id="colType" text="Type" prefWidth="100"/>
+                    <TableColumn fx:id="colAmount" text="Amount" prefWidth="100"/>
+                    <TableColumn fx:id="colMileage" text="Mileage" prefWidth="80"/>
+                    <TableColumn fx:id="colStatus" text="Status" prefWidth="100"/>
+                </columns>
+            </TableView>
+
+            <HBox spacing="15" alignment="CENTER_RIGHT">
+                <Button text="Export to CSV" onAction="#exportCSV"/>
+                <Button text="Export to PDF" onAction="#exportPDF"/>
+                <Button text="Reject Selected" onAction="#rejectExpense" style="-fx-background-color: #ffcccc; -fx-text-fill: red;"/>
+                <Button text="Approve Selected" onAction="#approveExpense" style="-fx-background-color: #ccffcc; -fx-text-fill: green;"/>
+            </HBox>
+        </VBox>
+    </center>
+
+    <bottom>
+        <HBox style="-fx-padding: 10;">
+            <Button text="Log Out" onAction="#onLogout"/>
+        </HBox>
+    </bottom>
+</BorderPane>
