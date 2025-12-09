@@ -26,7 +26,8 @@ module brennan.transportauditlogin {
     requires com.github.librepdf.openpdf;
 
     // This allows JavaFX FXML to access the controller classes
-    opens brennan.transportauditlogin to javafx.fxml;
+    // NEW FIX: Allows Firestore to load your Expense class
+    opens brennan.transportauditlogin to javafx.fxml, google.cloud.firestore;
 
     // This exports the package so the JavaFX launcher can start it
     exports brennan.transportauditlogin;

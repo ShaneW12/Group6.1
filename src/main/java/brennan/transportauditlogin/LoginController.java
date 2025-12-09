@@ -43,7 +43,6 @@ public class LoginController {
     public void initialize() {
         try {
             // Load the background image
-            // We use the absolute path "/" to ensure Maven finds it in resources
             String imagePath = getClass().getResource("/taxi.jpg").toExternalForm();
             Image image = new Image(imagePath);
 
@@ -57,7 +56,7 @@ public class LoginController {
             rootPane.setBackground(new Background(backgroundImage));
 
         } catch (Exception e) {
-            System.err.println("Warning: Could not load background image 'taxi.jpg'. Check the file location.");
+            System.err.println("Warning: Could not load background image 'taxi.jpg'. Check file location.");
         }
     }
 
@@ -94,12 +93,10 @@ public class LoginController {
 
             // 3. Handle Role Redirection
             if ("Manager".equalsIgnoreCase(role)) {
-                // Open Manager Dashboard
                 openManagerDashboard();
             } else {
-                // Driver or other role
-                showAlert(Alert.AlertType.INFORMATION, "Login Successful",
-                        "Welcome! Driver interface is coming soon.\nRole: " + role);
+                // Pass the email to the Driver Dashboard so it knows who logged in
+                openDriverDashboard(email);
             }
 
         } catch (FirebaseAuthException e) {
@@ -113,20 +110,36 @@ public class LoginController {
 
     private void openManagerDashboard() {
         try {
-            // Load the dashboard FXML
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/manager-dashboard.fxml"));
-
-            // Set the scene size larger for the dashboard (900x600)
             Scene scene = new Scene(fxmlLoader.load(), 900, 600);
 
-            // Get the current stage (window)
             Stage stage = (Stage) emailField.getScene().getWindow();
             stage.setScene(scene);
-            stage.centerOnScreen(); // Center the new larger window
+            stage.centerOnScreen();
 
         } catch (IOException e) {
             e.printStackTrace();
             showAlert(Alert.AlertType.ERROR, "Navigation Error", "Could not load the Manager Dashboard.");
+        }
+    }
+
+    private void openDriverDashboard(String email) {
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/driver-dashboard.fxml"));
+            Scene scene = new Scene(fxmlLoader.load(), 1000, 700);
+
+            // --- CRITICAL FIX: Pass the email to the Driver Controller ---
+            DriverDashboardController driverController = fxmlLoader.getController();
+            driverController.setDriverEmail(email);
+            // -------------------------------------------------------------
+
+            Stage stage = (Stage) emailField.getScene().getWindow();
+            stage.setScene(scene);
+            stage.centerOnScreen();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Navigation Error", "Could not load the Driver Dashboard.");
         }
     }
 

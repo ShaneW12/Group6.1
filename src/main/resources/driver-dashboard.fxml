@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.web.WebView?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="brennan.transportauditlogin.DriverDashboardController">
+
+    <top>
+        <HBox style="-fx-background-color: #333; -fx-padding: 15;">
+            <Label text="Driver Logistics Terminal" textFill="WHITE">
+                <font><Font name="System Bold" size="18"/></font>
+            </Label>
+            <HBox HBox.hgrow="ALWAYS" alignment="CENTER_RIGHT">
+                <Label fx:id="welcomeLabel" text="Welcome, Driver" textFill="#cccccc"/>
+                <Button text="Logout" onAction="#onLogout" style="-fx-background-color: transparent; -fx-text-fill: white; -fx-underline: true;"/>
+            </HBox>
+        </HBox>
+    </top>
+
+    <left>
+        <VBox spacing="15" style="-fx-padding: 20; -fx-background-color: #f4f4f4; -fx-pref-width: 350;">
+            <Label text="New Trip Entry" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+
+            <Label text="Start Address:" />
+            <TextField fx:id="startAddress" promptText="e.g. 123 Main St, New York"/>
+
+            <Label text="End Address:" />
+            <TextField fx:id="endAddress" promptText="e.g. 456 Broad St, Newark"/>
+
+            <Button text="Calculate Route (GPS)" onAction="#calculateRoute"
+                    style="-fx-background-color: #2196F3; -fx-text-fill: white; -fx-pref-width: 310;"/>
+
+            <Separator/>
+
+            <Label text="Manual Override (Optional)" style="-fx-font-weight: bold;"/>
+            <HBox spacing="10">
+                <VBox>
+                    <Label text="Miles:"/>
+                    <TextField fx:id="manualMiles" promptText="0.0" prefWidth="100"/>
+                </VBox>
+                <VBox>
+                    <Label text="Cost ($):"/>
+                    <TextField fx:id="manualCost" promptText="0.00" prefWidth="100"/>
+                </VBox>
+            </HBox>
+
+            <Separator/>
+
+            <VBox style="-fx-background-color: white; -fx-padding: 10; -fx-border-color: #ddd; -fx-border-radius: 5;">
+                <Label text="Trip Summary" style="-fx-underline: true;"/>
+                <HBox spacing="5"><Label text="Distance: "/><Label fx:id="distLabel" text="-" style="-fx-font-weight: bold;"/></HBox>
+                <HBox spacing="5"><Label text="Est. Cost: "/><Label fx:id="costLabel" text="-" style="-fx-font-weight: bold;"/></HBox>
+            </VBox>
+
+            <Button text="Submit Trip Log" onAction="#submitLog"
+                    style="-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 14px; -fx-pref-width: 310;"/>
+        </VBox>
+    </left>
+
+    <center>
+        <VBox spacing="10" style="-fx-padding: 20;">
+            <Label text="Route Visualization" style="-fx-font-weight: bold;"/>
+            <WebView fx:id="mapWebView" prefHeight="250"/>
+
+            <Label text="My Trip History" style="-fx-font-weight: bold;"/>
+            <TableView fx:id="tripTable" VBox.vgrow="ALWAYS">
+                <columns>
+                    <TableColumn fx:id="colDate" text="Date" prefWidth="100"/>
+                    <TableColumn fx:id="colType" text="Type" prefWidth="120"/>
+                    <TableColumn fx:id="colMiles" text="Miles" prefWidth="80"/>
+                    <TableColumn fx:id="colCost" text="Cost" prefWidth="80"/>
+                    <TableColumn fx:id="colStatus" text="Status" prefWidth="100"/>
+                </columns>
+            </TableView>
+        </VBox>
+    </center>
+
+</BorderPane>
