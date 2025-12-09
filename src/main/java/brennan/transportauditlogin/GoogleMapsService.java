@@ -2,7 +2,7 @@ package brennan.transportauditlogin;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import java.io.IOException;
+import io.github.cdimascio.dotenv.Dotenv;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -12,8 +12,9 @@ import java.nio.charset.StandardCharsets;
 
 public class GoogleMapsService {
 
-    // REPLACE THIS WITH YOUR REAL GOOGLE MAPS API KEY
-    private static final String API_KEY = "AIzaSyD4kEGu8TyGyznen04mwUtp5EacLaWXxA0";
+    // Load API key from .env file
+    private static final Dotenv dotenv = Dotenv.load();
+    private static final String API_KEY = dotenv.get("GOOGLE_MAPS_API_KEY");
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final Gson gson = new Gson();

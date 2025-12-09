@@ -13,6 +13,9 @@ module brennan.transportauditlogin {
     requires com.google.common;
     requires google.cloud.core;
 
+    // Allows me to hide both cloud and firebase keys
+    requires io.github.cdimascio.dotenv.java;
+
     // GSON requirement (for Group6_otherCode.MapController)
     requires com.google.gson; // <-- THIS IS THE NEW LINE FOR GSON
 

@@ -5,6 +5,7 @@ import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.cloud.firestore.QuerySnapshot;
 import com.google.firebase.cloud.FirestoreClient;
+import io.github.cdimascio.dotenv.Dotenv; // Import added
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -49,6 +50,9 @@ public class DriverDashboardController {
     private final ObservableList<Expense> myTrips = FXCollections.observableArrayList();
     private final double RATE_PER_MILE = 0.67; // IRS Standard Rate
 
+    // Load Dotenv to access the API Key securely
+    private final Dotenv dotenv = Dotenv.load();
+
     // Current user's email/ID to filter logs
     private String currentUserEmail;
 
@@ -60,21 +64,17 @@ public class DriverDashboardController {
         colCost.setCellValueFactory(new PropertyValueFactory<>("amount"));
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
 
-        // NOTE: We REMOVED the FirebaseAuth.getInstance().getCurrentUser() code here.
-        // We will load the history in the 'setDriverEmail' method instead.
-        // Load a default map view
         WebEngine webEngine = mapWebView.getEngine();
         webEngine.load("https://www.google.com/maps");
     }
 
-    // --- NEW METHOD ---
     /**
      * Called by LoginController to pass the logged-in user's email.
      */
     public void setDriverEmail(String email) {
         this.currentUserEmail = email;
         welcomeLabel.setText("Driver: " + email);
-        loadMyHistory(); // Now that we have the email, we can load the data
+        loadMyHistory();
     }
 
     @FXML
@@ -97,12 +97,12 @@ public class DriverDashboardController {
             double cost = route.miles * RATE_PER_MILE;
             costLabel.setText(String.format("$%.2f", cost));
 
-            // Auto-fill the manual fields (so they can be edited if needed)
+            // Auto-fill the manual fields
             manualMiles.setText(String.format("%.1f", route.miles));
             manualCost.setText(String.format("%.2f", cost));
 
-            // Update Map View to show directions
-            String apiKey = "AIzaSyD4kEGu8TyGyznen04mwUtp5EacLaWXxA0";
+            // --- SECURITY FIX: Use the Key from .env, not hardcoded string ---
+            String apiKey = dotenv.get("GOOGLE_MAPS_API_KEY");
 
             String mapUrl = "https://www.google.com/maps/embed/v1/directions" +
                     "?key=" + apiKey +
@@ -110,7 +110,6 @@ public class DriverDashboardController {
                     "&destination=" + end.replace(" ", "+") +
                     "&mode=driving";
 
-            // simple HTML string that holds an IFrame because the google maps API needs to be embedded in a website to function properly
             String htmlContent = "<!DOCTYPE html>" +
                     "<html>" +
                     "<head>" +
@@ -121,7 +120,7 @@ public class DriverDashboardController {
                     "src='" + mapUrl + "' allowfullscreen></iframe>" +
                     "</body>" +
                     "</html>";
-            // Loads HTML content
+
             mapWebView.getEngine().loadContent(htmlContent);
 
         } else {
@@ -131,6 +130,7 @@ public class DriverDashboardController {
 
     @FXML
     private void submitLog() {
+        // ... (Keep existing submitLog logic exactly as is)
         String milesStr = manualMiles.getText();
         String costStr = manualCost.getText();
 
@@ -143,22 +143,19 @@ public class DriverDashboardController {
             double miles = Double.parseDouble(milesStr);
             double cost = Double.parseDouble(costStr);
 
-            // Creates Data Object
             Map<String, Object> data = new HashMap<>();
-            data.put("employeeName", currentUserEmail); // Tie to this driver
+            data.put("employeeName", currentUserEmail);
             data.put("date", LocalDate.now().toString());
-            data.put("type", "Mileage"); // Auto-set type
+            data.put("type", "Mileage");
             data.put("amount", cost);
             data.put("mileage", miles);
-            data.put("status", "Pending"); // Default status
+            data.put("status", "Pending");
 
-            // Saves to Firestore
             Firestore db = FirestoreClient.getFirestore();
             db.collection("expenses").add(data);
 
             showAlert(Alert.AlertType.INFORMATION, "Success", "Trip log submitted for approval.");
 
-            // Clears fields and refreshes
             startAddress.clear();
             endAddress.clear();
             manualMiles.clear();
@@ -174,10 +171,10 @@ public class DriverDashboardController {
     }
 
     private void loadMyHistory() {
+        // ... (Keep existing loadMyHistory logic)
         myTrips.clear();
         Firestore db = FirestoreClient.getFirestore();
 
-        // Query only expenses where employeeName matches current user
         ApiFuture<QuerySnapshot> future = db.collection("expenses")
                 .whereEqualTo("employeeName", currentUserEmail)
                 .get();

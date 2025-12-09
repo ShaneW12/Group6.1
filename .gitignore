@@ -4,7 +4,7 @@ target/
 !**/src/test/**/target/
 
 # Firebase Service Account Key - DO NOT COMMIT
-*.json
+.json
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
@@ -39,3 +39,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# Ignore environment variables
+.env

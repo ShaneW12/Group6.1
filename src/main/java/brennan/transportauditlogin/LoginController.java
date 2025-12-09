@@ -7,12 +7,15 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
 import com.google.firebase.cloud.FirestoreClient;
+import com.google.gson.Gson; // Added for safe JSON handling
+import io.github.cdimascio.dotenv.Dotenv;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button; // Explicit import just in case
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
@@ -24,17 +27,21 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.HashMap; // Added
+import java.util.Map;     // Added
 
 public class LoginController {
 
-    // --- PASTE YOUR FIREBASE WEB API KEY HERE ---
-    private static final String FIREBASE_WEB_API_KEY = "AIzaSyBlyVFqxTv9UU_OQWyKag1sMsZelaTV9WQ";
+    private static final Dotenv dotenv = Dotenv.load();
+    private static final String FIREBASE_WEB_API_KEY = dotenv.get("FIREBASE_API_KEY");
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @FXML private GridPane rootPane; // Used for the background image
     @FXML private TextField emailField;
     @FXML private PasswordField passwordField;
+    @FXML private Button loginButton;
+    @FXML private Button registerButton;
 
     /**
      * Initializes the controller class. This method is automatically called
@@ -71,9 +78,9 @@ public class LoginController {
         }
 
         try {
-            // 1. Verify the password using the REST API
+            // 1. Verify the password using the REST API (with fixed JSON handling)
             if (!verifyPassword(email, password)) {
-                showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid email or password.");
+                showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid email or password.\n(Check console for details)");
                 passwordField.clear();
                 return;
             }
@@ -128,10 +135,10 @@ public class LoginController {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/driver-dashboard.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 1000, 700);
 
-            // --- CRITICAL FIX: Pass the email to the Driver Controller ---
+            // --- Pass the email to the Driver Controller ---
             DriverDashboardController driverController = fxmlLoader.getController();
             driverController.setDriverEmail(email);
-            // -------------------------------------------------------------
+            // -----------------------------------------------
 
             Stage stage = (Stage) emailField.getScene().getWindow();
             stage.setScene(scene);
@@ -184,10 +191,13 @@ public class LoginController {
     // --- HELPER METHODS ---
 
     private boolean verifyPassword(String email, String password) throws IOException, InterruptedException {
-        String jsonPayload = String.format(
-                "{\"email\":\"%s\",\"password\":\"%s\",\"returnSecureToken\":true}",
-                email, password
-        );
+        // Use Gson to create valid JSON, handling special characters in passwords automatically
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("email", email);
+        payload.put("password", password);
+        payload.put("returnSecureToken", true);
+
+        String jsonPayload = new Gson().toJson(payload);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + FIREBASE_WEB_API_KEY))
@@ -197,15 +207,24 @@ public class LoginController {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        // 200 OK means password is correct
-        return response.statusCode() == 200;
+        // Check for success (200 OK)
+        if (response.statusCode() == 200) {
+            return true;
+        } else {
+            // --- DEBUGGING: Print the actual error from Firebase to the console ---
+            System.err.println("Login Failed. Status Code: " + response.statusCode());
+            System.err.println("Firebase Response: " + response.body());
+            return false;
+        }
     }
 
     private boolean sendPasswordResetEmail(String email) throws IOException, InterruptedException {
-        String jsonPayload = String.format(
-                "{\"requestType\":\"PASSWORD_RESET\",\"email\":\"%s\"}",
-                email
-        );
+        // Use Gson here as well for consistency
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("requestType", "PASSWORD_RESET");
+        payload.put("email", email);
+
+        String jsonPayload = new Gson().toJson(payload);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=" + FIREBASE_WEB_API_KEY))
@@ -214,6 +233,11 @@ public class LoginController {
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            System.err.println("Reset Email Failed. Status: " + response.statusCode());
+            System.err.println("Response: " + response.body());
+        }
 
         return response.statusCode() == 200;
     }

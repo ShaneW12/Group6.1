@@ -13,7 +13,7 @@ public class FirebaseService {
         try {
             // The path to your service account key JSON file
             // This assumes the file is in 'src/main/resources'
-            String serviceAccountPath = "/transportaudit-9d899-firebase-adminsdk-fbsvc-21bf609568.json";
+            String serviceAccountPath = "/transportaudit-9d899-firebase-adminsdk-fbsvc-56357b1945.json";
 
             // Load the service account file from the resources
             InputStream serviceAccount = FirebaseService.class.getResourceAsStream(serviceAccountPath);
