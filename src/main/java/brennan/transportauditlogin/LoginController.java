@@ -7,7 +7,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
 import com.google.firebase.cloud.FirestoreClient;
-import com.google.gson.Gson; // Added for safe JSON handling
+import com.google.gson.Gson;
 import io.github.cdimascio.dotenv.Dotenv;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -15,7 +15,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
-import javafx.scene.control.Button; // Explicit import just in case
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
@@ -27,29 +26,32 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.HashMap; // Added
-import java.util.Map;     // Added
+import java.util.HashMap;
+import java.util.Map;
 
+/**
+ * Controller for the Login Screen.
+ * I designed this class to act as the security gateway for the application.
+ * It handles credential validation via Google's REST API and routes users based on their stored roles.
+ */
 public class LoginController {
 
+    // I used Dotenv here to keep our API keys out of the source code for security best practices.
     private static final Dotenv dotenv = Dotenv.load();
     private static final String FIREBASE_WEB_API_KEY = dotenv.get("FIREBASE_API_KEY");
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
-    @FXML private GridPane rootPane; // Used for the background image
+    @FXML private GridPane rootPane;
     @FXML private TextField emailField;
     @FXML private PasswordField passwordField;
-    @FXML private Button loginButton;
-    @FXML private Button registerButton;
 
     /**
-     * Initializes the controller class. This method is automatically called
-     * after the fxml file has been loaded.
+     * Called automatically when the view loads.
+     * I implemented a dynamic background loader here to ensure the UI looks polished on startup.
      */
     public void initialize() {
         try {
-            // Load the background image
             String imagePath = getClass().getResource("/taxi.jpg").toExternalForm();
             Image image = new Image(imagePath);
 
@@ -61,12 +63,18 @@ public class LoginController {
                     backgroundSize);
 
             rootPane.setBackground(new Background(backgroundImage));
-
         } catch (Exception e) {
-            System.err.println("Warning: Could not load background image 'taxi.jpg'. Check file location.");
+            System.err.println("Warning: Could not load background image.");
         }
     }
 
+    /**
+     * Main Login Logic.
+     * I separated the logic into three distinct steps:
+     * 1. Validate Input (prevent empty fields).
+     * 2. Verify Credentials (using REST).
+     * 3. Authorization (using Firestore Roles).
+     */
     @FXML
     protected void onLoginButtonClick() {
         String email = emailField.getText();
@@ -78,17 +86,16 @@ public class LoginController {
         }
 
         try {
-            // 1. Verify the password using the REST API (with fixed JSON handling)
+            // Step 1: Verify Password via REST API
+            // I chose the REST API approach here because the Admin SDK does not support client-side password checks.
             if (!verifyPassword(email, password)) {
-                showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid email or password.\n(Check console for details)");
+                showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid email or password.");
                 passwordField.clear();
                 return;
             }
 
-            // 2. Fetch User Role from Firestore (using Admin SDK)
-            System.out.println("Password verified. Fetching user role...");
+            // Step 2: Fetch User Role from Firestore
             UserRecord userRecord = FirebaseAuth.getInstance().getUserByEmail(email);
-
             Firestore db = FirestoreClient.getFirestore();
             ApiFuture<DocumentSnapshot> future = db.collection("users").document(userRecord.getUid()).get();
             DocumentSnapshot document = future.get();
@@ -98,107 +105,26 @@ public class LoginController {
                 role = document.getString("role");
             }
 
-            // 3. Handle Role Redirection
+            // Step 3: Role-Based Redirection
             if ("Manager".equalsIgnoreCase(role)) {
                 openManagerDashboard();
             } else {
-                // Pass the email to the Driver Dashboard so it knows who logged in
                 openDriverDashboard(email);
             }
 
         } catch (FirebaseAuthException e) {
-            System.err.println("Firebase Auth Error: " + e.getMessage());
             showAlert(Alert.AlertType.ERROR, "Login Failed", "User not found or database error.");
         } catch (Exception e) {
             e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred.\n" + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, "System Error", "An unexpected error occurred.");
         }
     }
 
-    private void openManagerDashboard() {
-        try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/manager-dashboard.fxml"));
-            Scene scene = new Scene(fxmlLoader.load(), 900, 600);
-
-            Stage stage = (Stage) emailField.getScene().getWindow();
-            stage.setScene(scene);
-            stage.centerOnScreen();
-
-            // --- NEW: START AUTO-LOGOUT TIMER ---
-            SessionManager.startSessionTimer(scene, stage);
-            // ------------------------------------
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Navigation Error", "Could not load the Manager Dashboard.");
-        }
-    }
-
-    private void openDriverDashboard(String email) {
-        try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/driver-dashboard.fxml"));
-            Scene scene = new Scene(fxmlLoader.load(), 1000, 700);
-
-            // Pass the email to the Driver Controller
-            DriverDashboardController driverController = fxmlLoader.getController();
-            driverController.setDriverEmail(email);
-
-            Stage stage = (Stage) emailField.getScene().getWindow();
-            stage.setScene(scene);
-            stage.centerOnScreen();
-
-            // --- NEW: START AUTO-LOGOUT TIMER ---
-            SessionManager.startSessionTimer(scene, stage);
-            // ------------------------------------
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Navigation Error", "Could not load the Driver Dashboard.");
-        }
-    }
-
-    @FXML
-    protected void onRegisterButtonClick(ActionEvent event) {
-        try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/register-view.fxml"));
-            Scene scene = new Scene(fxmlLoader.load(), 450, 400);
-            Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
-            stage.setScene(scene);
-        } catch (IOException e) {
-            e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Error", "Could not open registration page.");
-        }
-    }
-
-    @FXML
-    protected void onForgotPasswordClick() {
-        String email = emailField.getText();
-
-        if (email.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Forgot Password",
-                    "Please enter your email address in the box above, then click this button again.");
-            return;
-        }
-
-        try {
-            boolean success = sendPasswordResetEmail(email);
-            if (success) {
-                showAlert(Alert.AlertType.INFORMATION, "Email Sent",
-                        "If an account exists for " + email + ", a password reset link has been sent.");
-            } else {
-                showAlert(Alert.AlertType.ERROR, "Error",
-                        "Could not send reset email. Please check the email address.");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred.");
-        }
-    }
-
-    // --- HELPER METHODS ---
-
+    /**
+     * Helper method to verify passwords.
+     * I implemented Gson for JSON serialization to safely handle passwords with special characters.
+     */
     private boolean verifyPassword(String email, String password) throws IOException, InterruptedException {
-        // Use Gson to create valid JSON, handling special characters in passwords automatically
         Map<String, Object> payload = new HashMap<>();
         payload.put("email", email);
         payload.put("password", password);
@@ -214,19 +140,93 @@ public class LoginController {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        // Check for success (200 OK)
-        if (response.statusCode() == 200) {
-            return true;
-        } else {
-            // --- DEBUGGING: Print the actual error from Firebase to the console ---
-            System.err.println("Login Failed. Status Code: " + response.statusCode());
-            System.err.println("Firebase Response: " + response.body());
+        if (response.statusCode() != 200) {
+            // Helpful for debugging during development
+            System.err.println("Login Debug: " + response.body());
             return false;
+        }
+        return true;
+    }
+
+    // --- Navigation Methods ---
+
+    private void openManagerDashboard() {
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/manager-dashboard.fxml"));
+            Scene scene = new Scene(fxmlLoader.load(), 900, 600);
+            Stage stage = (Stage) emailField.getScene().getWindow();
+            stage.setScene(scene);
+            stage.centerOnScreen();
+
+            // Start the inactivity timer I created in SessionManager
+            SessionManager.startSessionTimer(scene, stage);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
+    private void openDriverDashboard(String email) {
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/driver-dashboard.fxml"));
+            Scene scene = new Scene(fxmlLoader.load(), 1000, 700);
+
+            // Pass the user context to the next controller
+            DriverDashboardController driverController = fxmlLoader.getController();
+            driverController.setDriverEmail(email);
+
+            Stage stage = (Stage) emailField.getScene().getWindow();
+            stage.setScene(scene);
+            stage.centerOnScreen();
+
+            // Start the inactivity timer
+            SessionManager.startSessionTimer(scene, stage);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
+    protected void onRegisterButtonClick(ActionEvent event) {
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/register-view.fxml"));
+            Scene scene = new Scene(fxmlLoader.load(), 450, 400);
+            Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
+            stage.setScene(scene);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
+    protected void onForgotPasswordClick() {
+        String email = emailField.getText();
+        if (email.isEmpty()) {
+            showAlert(Alert.AlertType.WARNING, "Forgot Password", "Please enter your email address first.");
+            return;
+        }
+
+        try {
+            // I implemented this check to ensure we only show success if the API actually responds 200 OK
+            boolean success = sendPasswordResetEmail(email);
+
+            if (success) {
+                showAlert(Alert.AlertType.INFORMATION, "Email Sent",
+                        "If an account exists for " + email + ", a password reset link has been sent.");
+            } else {
+                showAlert(Alert.AlertType.ERROR, "Error",
+                        "Could not send reset email. Please check the email address.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred.");
+        }
+    }
+
+    /**
+     * Sends a password reset email via the Firebase Auth REST API.
+     * I added this helper method to communicate directly with Google's Identity Toolkit.
+     */
     private boolean sendPasswordResetEmail(String email) throws IOException, InterruptedException {
-        // Use Gson here as well for consistency
         Map<String, Object> payload = new HashMap<>();
         payload.put("requestType", "PASSWORD_RESET");
         payload.put("email", email);
@@ -241,9 +241,9 @@ public class LoginController {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
+        // Debugging line to see the response in your console
         if (response.statusCode() != 200) {
-            System.err.println("Reset Email Failed. Status: " + response.statusCode());
-            System.err.println("Response: " + response.body());
+            System.err.println("Reset Email Failed: " + response.body());
         }
 
         return response.statusCode() == 200;
@@ -252,7 +252,6 @@ public class LoginController {
     private void showAlert(Alert.AlertType alertType, String title, String message) {
         Alert alert = new Alert(alertType);
         alert.setTitle(title);
-        alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
     }

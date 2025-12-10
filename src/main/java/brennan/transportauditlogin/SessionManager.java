@@ -3,7 +3,6 @@ package brennan.transportauditlogin;
 import javafx.animation.PauseTransition;
 import javafx.event.EventHandler;
 import javafx.fxml.FXMLLoader;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.input.InputEvent;
 import javafx.stage.Stage;
@@ -11,59 +10,51 @@ import javafx.util.Duration;
 
 import java.io.IOException;
 
+/**
+ * Utility class to handle security timeouts.
+ * I implemented this to enforce a strict security policy:
+ * If a user is inactive for 5 minutes, they are automatically logged out to prevent unauthorized access.
+ */
 public class SessionManager {
 
-    // Default timeout in seconds (300 seconds = 5 minutes)
-    private static final double TIMEOUT_SECONDS = 300;
-
+    private static final double TIMEOUT_SECONDS = 300; // 5 Minutes
     private static PauseTransition delay;
 
     /**
      * Starts tracking user inactivity on the given scene.
-     * @param scene The scene to monitor (Driver or Manager Dashboard)
-     * @param stage The stage (window) effectively needed to perform the logout navigation
+     * I used an EventFilter here to catch ALL input events (mouse, keyboard) before they reach other nodes.
      */
     public static void startSessionTimer(Scene scene, Stage stage) {
-        // 1. Create the timer
         if (delay != null) {
-            delay.stop(); // Stop any existing timer
+            delay.stop();
         }
 
+        // The timer that triggers the logout
         delay = new PauseTransition(Duration.seconds(TIMEOUT_SECONDS));
-
-        // 2. Define what happens when time runs out
         delay.setOnFinished(event -> {
-            System.out.println("Session timed out. Logging out...");
+            System.out.println("Session timed out. Performing secure logout.");
             performLogout(stage);
         });
 
-        // 3. Create an event handler that resets the timer on ANY input
+        // The listener that resets the timer on any interaction
         EventHandler<InputEvent> activityHandler = event -> {
             delay.playFromStart(); // Reset timer to 0
         };
 
-        // 4. Attach the handler to the scene (Mouse moves, clicks, key presses)
+        // Attach the handler to the scene
         scene.addEventFilter(InputEvent.ANY, activityHandler);
-
-        // 5. Start the timer initially
         delay.play();
     }
 
-    /**
-     * Stops the timer (call this when manually logging out)
-     */
     public static void stopSessionTimer() {
         if (delay != null) {
             delay.stop();
         }
     }
 
-    /**
-     * Handles the actual navigation back to the login screen
-     */
     private static void performLogout(Stage stage) {
         try {
-            stopSessionTimer(); // Cleanup
+            stopSessionTimer();
 
             FXMLLoader fxmlLoader = new FXMLLoader(SessionManager.class.getResource("/login-view.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 400, 300);
@@ -72,11 +63,6 @@ public class SessionManager {
             stage.setScene(scene);
             stage.centerOnScreen();
             stage.show();
-
-            // Optional: Show an alert saying they were logged out
-            // (Note: Showing an alert here can be tricky if the window is minimized,
-            // but simply switching the scene is safe).
-
         } catch (IOException e) {
             e.printStackTrace();
         }

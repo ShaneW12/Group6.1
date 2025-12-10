@@ -26,21 +26,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+/**
+ * Controller for the Driver Dashboard.
+ * I designed this interface to be the primary workspace for drivers.
+ * It integrates Google Maps for route verification and allows for easy expense submission.
+ */
 public class DriverDashboardController {
 
     @FXML private Label welcomeLabel;
     @FXML private TextField startAddress;
     @FXML private TextField endAddress;
 
-    // --- NEW: The Dropdown Box ---
+    // I added a ComboBox for expense types to standardize the data entry
     @FXML private ComboBox<String> expenseTypeCombo;
-
     @FXML private TextField manualMiles;
     @FXML private TextField manualCost;
 
     @FXML private Label distLabel;
     @FXML private Label costLabel;
-
     @FXML private WebView mapWebView;
 
     @FXML private TableView<Expense> tripTable;
@@ -52,28 +55,49 @@ public class DriverDashboardController {
 
     private final GoogleMapsService mapsService = new GoogleMapsService();
     private final ObservableList<Expense> myTrips = FXCollections.observableArrayList();
-    private final double RATE_PER_MILE = 0.67;
+    private final double RATE_PER_MILE = 0.67; // Based on 2024 IRS Standard
     private final Dotenv dotenv = Dotenv.load();
 
     private String currentUserEmail;
 
     public void initialize() {
-        // 1. Setup Table Columns
+        setupTable();
+        setupMap();
+        setupInputs();
+    }
+
+    private void setupTable() {
         colDate.setCellValueFactory(new PropertyValueFactory<>("date"));
         colType.setCellValueFactory(new PropertyValueFactory<>("type"));
         colMiles.setCellValueFactory(new PropertyValueFactory<>("mileage"));
         colCost.setCellValueFactory(new PropertyValueFactory<>("amount"));
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
+    }
 
-        // 2. Setup Map
+    private void setupMap() {
         WebEngine webEngine = mapWebView.getEngine();
         webEngine.load("https://www.google.com/maps");
+    }
 
-        // 3. NEW: Initialize the Dropdown Options
+    /**
+     * I implemented a listener here to make the UI dynamic.
+     * If a driver selects "Fuel" or "Tolls", the mileage field is automatically disabled.
+     * This reduces user error and keeps the data clean.
+     */
+    private void setupInputs() {
         expenseTypeCombo.setItems(FXCollections.observableArrayList(
                 "Mileage", "Fuel", "Maintenance", "Tolls", "Parking", "Other"
         ));
-        expenseTypeCombo.getSelectionModel().select("Mileage"); // Default to Mileage
+        expenseTypeCombo.getSelectionModel().select("Mileage");
+
+        expenseTypeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if ("Mileage".equals(newVal)) {
+                manualMiles.setDisable(false);
+            } else {
+                manualMiles.setDisable(true);
+                manualMiles.clear();
+            }
+        });
     }
 
     public void setDriverEmail(String email) {
@@ -82,52 +106,54 @@ public class DriverDashboardController {
         loadMyHistory();
     }
 
+    /**
+     * Calculates the route using the Google Directions API.
+     * I ensure the API Key is loaded from the secure .env file here.
+     */
     @FXML
     private void calculateRoute() {
-        // Calculates the distance of the route
         String start = startAddress.getText();
         String end = endAddress.getText();
 
         if (start.isEmpty() || end.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Missing Info", "Please enter start and end addresses.");
+            showAlert(Alert.AlertType.WARNING, "Missing Info", "Please enter addresses.");
             return;
         }
 
         GoogleMapsService.RouteInfo route = mapsService.getRouteDetails(start, end);
 
         if (route != null) {
-            distLabel.setText(route.text);
-            double cost = route.miles * RATE_PER_MILE;
-            costLabel.setText(String.format("$%.2f", cost));
-
-            // Auto-fill fields
-            manualMiles.setText(String.format("%.1f", route.miles));
-            manualCost.setText(String.format("%.2f", cost));
-
-            // Ensures "Mileage" is selected since we just calculated a route
-            expenseTypeCombo.getSelectionModel().select("Mileage");
-
-            // Load Map
-            String apiKey = dotenv.get("GOOGLE_MAPS_API_KEY");
-            String mapUrl = "https://www.google.com/maps/embed/v1/directions" +
-                    "?key=" + apiKey +
-                    "&origin=" + start.replace(" ", "+") +
-                    "&destination=" + end.replace(" ", "+") +
-                    "&mode=driving";
-
-            // (HTML map code omitted for brevity) ...
-            String htmlContent = "<!DOCTYPE html><html><head><style>body,html{margin:0;padding:0;height:100%;overflow:hidden;}</style></head><body><iframe width='100%' height='100%' frameborder='0' style='border:0' src='" + mapUrl + "' allowfullscreen></iframe></body></html>";
-            mapWebView.getEngine().loadContent(htmlContent);
-
+            updateUIWithRoute(route, start, end);
         } else {
             showAlert(Alert.AlertType.ERROR, "GPS Error", "Could not calculate route.");
         }
     }
 
+    private void updateUIWithRoute(GoogleMapsService.RouteInfo route, String start, String end) {
+        distLabel.setText(route.text);
+        double cost = route.miles * RATE_PER_MILE;
+        costLabel.setText(String.format("$%.2f", cost));
+
+        // Auto-fill fields for the user
+        manualMiles.setText(String.format("%.1f", route.miles));
+        manualCost.setText(String.format("%.2f", cost));
+        expenseTypeCombo.getSelectionModel().select("Mileage");
+
+        // Load the embedded map
+        String apiKey = dotenv.get("GOOGLE_MAPS_API_KEY");
+        String mapUrl = "https://www.google.com/maps/embed/v1/directions" +
+                "?key=" + apiKey +
+                "&origin=" + start.replace(" ", "+") +
+                "&destination=" + end.replace(" ", "+") +
+                "&mode=driving";
+
+        String htmlContent = "<!DOCTYPE html><html><head><style>body,html{margin:0;padding:0;height:100%;overflow:hidden;}</style></head><body><iframe width='100%' height='100%' frameborder='0' style='border:0' src='" + mapUrl + "' allowfullscreen></iframe></body></html>";
+        mapWebView.getEngine().loadContent(htmlContent);
+    }
+
     @FXML
     private void submitLog() {
-        String type = expenseTypeCombo.getValue(); // Get the selected type
-        String milesStr = manualMiles.getText();
+        String type = expenseTypeCombo.getValue();
         String costStr = manualCost.getText();
 
         if (costStr.isEmpty()) {
@@ -138,49 +164,33 @@ public class DriverDashboardController {
         try {
             double cost = Double.parseDouble(costStr);
             double miles = 0.0;
-
-            // Logic: If user enters text in miles, parse it. If empty, default to 0.
-            if (!milesStr.isEmpty()) {
-                miles = Double.parseDouble(milesStr);
+            if (!manualMiles.getText().isEmpty()) {
+                miles = Double.parseDouble(manualMiles.getText());
             }
 
-            // Validation: If they selected "Mileage", they MUST have miles entered.
-            if (type.equals("Mileage") && miles == 0) {
-                showAlert(Alert.AlertType.ERROR, "Error", "For 'Mileage' expenses, the miles field cannot be 0.");
-                return;
-            }
-
-            // Create Data Object
-            Map<String, Object> data = new HashMap<>();
-            data.put("employeeName", currentUserEmail);
-            data.put("date", LocalDate.now().toString());
-            data.put("type", type); // Use the selected type
-            data.put("amount", cost);
-            data.put("mileage", miles);
-            data.put("status", "Pending");
-
-            Firestore db = FirestoreClient.getFirestore();
-            db.collection("expenses").add(data);
-
-            showAlert(Alert.AlertType.INFORMATION, "Success", type + " log submitted for approval.");
-
-            // Clear Form
-            startAddress.clear();
-            endAddress.clear();
-            manualMiles.clear();
-            manualCost.clear();
-            distLabel.setText("-");
-            costLabel.setText("-");
-            expenseTypeCombo.getSelectionModel().select("Mileage"); // Reset to default
-
-            loadMyHistory();
+            saveExpenseToFirestore(type, cost, miles);
 
         } catch (NumberFormatException e) {
-            showAlert(Alert.AlertType.ERROR, "Format Error", "Cost and Miles must be valid numbers.");
+            showAlert(Alert.AlertType.ERROR, "Format Error", "Must be valid numbers.");
         }
     }
 
-    // ... (Keep loadMyHistory, onLogout, and showAlert exactly as they were) ...
+    private void saveExpenseToFirestore(String type, double cost, double miles) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("employeeName", currentUserEmail);
+        data.put("date", LocalDate.now().toString());
+        data.put("type", type);
+        data.put("amount", cost);
+        data.put("mileage", miles);
+        data.put("status", "Pending");
+
+        Firestore db = FirestoreClient.getFirestore();
+        db.collection("expenses").add(data);
+
+        showAlert(Alert.AlertType.INFORMATION, "Success", "Trip log submitted.");
+        loadMyHistory();
+    }
+
     private void loadMyHistory() {
         myTrips.clear();
         Firestore db = FirestoreClient.getFirestore();
@@ -200,10 +210,8 @@ public class DriverDashboardController {
 
     @FXML
     private void onLogout(ActionEvent event) {
-        // --- NEW: Stop the timer to prevent memory leaks ---
+        // I make sure to stop the timer to prevent memory leaks when logging out
         SessionManager.stopSessionTimer();
-        // --------------------------------------------------
-
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/login-view.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 400, 300);
@@ -217,7 +225,6 @@ public class DriverDashboardController {
     private void showAlert(Alert.AlertType type, String title, String msg) {
         Alert alert = new Alert(type);
         alert.setTitle(title);
-        alert.setHeaderText(null);
         alert.setContentText(msg);
         alert.showAndWait();
     }
