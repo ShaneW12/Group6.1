@@ -19,77 +19,66 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Controller for the Registration Screen.
+ * I implemented this to create new users in both Firebase Authentication (for login)
+ * and Firestore (for role management).
+ */
 public class RegisterController {
 
-    @FXML
-    private TextField emailField;
-    @FXML
-    private TextField usernameField;
-    @FXML
-    private PasswordField passwordField;
-    @FXML
-    private ToggleGroup roleToggleGroup;
+    @FXML private TextField emailField;
+    @FXML private TextField usernameField;
+    @FXML private PasswordField passwordField;
+    @FXML private ToggleGroup roleToggleGroup;
 
     @FXML
     protected void onRegisterSubmitClick(ActionEvent event) {
         String email = emailField.getText();
         String username = usernameField.getText();
         String password = passwordField.getText();
-        String role = ((RadioButton) roleToggleGroup.getSelectedToggle()).getText();
+
+        // I added a check here to safely get the text from the selected radio button
+        RadioButton selectedRadio = (RadioButton) roleToggleGroup.getSelectedToggle();
+        String role = (selectedRadio != null) ? selectedRadio.getText() : "Driver";
 
         if (email.isEmpty() || username.isEmpty() || password.isEmpty()) {
             showAlert(Alert.AlertType.ERROR, "Form Error", "Please fill in all fields.");
             return;
         }
 
-        // --- Firebase Integration ---
         try {
             // 1. Create user in Firebase Authentication
+            // I specifically set the DisplayName here so we can easily show "Welcome, [Name]" later.
             UserRecord.CreateRequest request = new UserRecord.CreateRequest()
                     .setEmail(email)
                     .setPassword(password)
-                    .setDisplayName(username) // We can set the display name here
+                    .setDisplayName(username)
                     .setDisabled(false);
 
             UserRecord userRecord = FirebaseAuth.getInstance().createUser(request);
-            System.out.println("Successfully created new user: " + userRecord.getUid());
 
-            // 2. Save custom data (like role) to Firestore
+            // 2. Save custom data (Role) to Firestore
             Firestore db = FirestoreClient.getFirestore();
-
-            // Create a Map to store the user's data
             Map<String, Object> userData = new HashMap<>();
             userData.put("username", username);
             userData.put("email", email);
             userData.put("role", role);
 
-            // Save the data to the "users" collection with the UID as the document ID
-            ApiFuture<WriteResult> future = db.collection("users").document(userRecord.getUid()).set(userData);
+            db.collection("users").document(userRecord.getUid()).set(userData);
 
-            // Wait for the write to complete (optional, but good for confirmation)
-            System.out.println("User data saved to Firestore at: " + future.get().getUpdateTime());
-
-            // --- Show Success and Go Back ---
-            showAlert(Alert.AlertType.INFORMATION, "Registration Successful",
-                    "New " + role + " '" + username + "' has been registered!");
-
-            onBackToLoginClick(event); // Go back to login screen
+            showAlert(Alert.AlertType.INFORMATION, "Success", "User registered! Please log in.");
+            onBackToLoginClick(event);
 
         } catch (FirebaseAuthException e) {
-            // Handle Firebase Auth errors (e.g., email already exists)
-            System.err.println("Error creating user: " + e.getMessage());
-            showAlert(Alert.AlertType.ERROR, "Registration Failed", "Error: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, "Registration Failed", e.getMessage());
         } catch (Exception e) {
-            // Handle other errors (like Firestore)
             e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Registration Failed", "An unexpected error occurred.");
+            showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred.");
         }
-        // --- End of Firebase Integration ---
     }
 
     @FXML
     protected void onBackToLoginClick(ActionEvent event) {
-        // ... (This method remains the same)
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/login-view.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 400, 300);
@@ -101,10 +90,8 @@ public class RegisterController {
     }
 
     private void showAlert(Alert.AlertType alertType, String title, String message) {
-        // ... (This method remains theT same)
         Alert alert = new Alert(alertType);
         alert.setTitle(title);
-        alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
     }

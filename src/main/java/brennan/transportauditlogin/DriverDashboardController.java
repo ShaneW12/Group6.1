@@ -26,18 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-/**
- * Controller for the Driver Dashboard.
- * I designed this interface to be the primary workspace for drivers.
- * It integrates Google Maps for route verification and allows for easy expense submission.
- */
 public class DriverDashboardController {
 
     @FXML private Label welcomeLabel;
     @FXML private TextField startAddress;
     @FXML private TextField endAddress;
 
-    // I added a ComboBox for expense types to standardize the data entry
     @FXML private ComboBox<String> expenseTypeCombo;
     @FXML private TextField manualMiles;
     @FXML private TextField manualCost;
@@ -55,10 +49,11 @@ public class DriverDashboardController {
 
     private final GoogleMapsService mapsService = new GoogleMapsService();
     private final ObservableList<Expense> myTrips = FXCollections.observableArrayList();
-    private final double RATE_PER_MILE = 0.67; // Based on 2024 IRS Standard
+    private final double RATE_PER_MILE = 0.67;
     private final Dotenv dotenv = Dotenv.load();
 
     private String currentUserEmail;
+    private String currentUsername; // I added this to track the display name
 
     public void initialize() {
         setupTable();
@@ -72,6 +67,19 @@ public class DriverDashboardController {
         colMiles.setCellValueFactory(new PropertyValueFactory<>("mileage"));
         colCost.setCellValueFactory(new PropertyValueFactory<>("amount"));
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
+
+        // Formats Cost Column to show $0.00 ---
+        colCost.setCellFactory(tc -> new TableCell<Expense, Double>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(String.format("$%.2f", item));
+                }
+            }
+        });
     }
 
     private void setupMap() {
@@ -79,11 +87,6 @@ public class DriverDashboardController {
         webEngine.load("https://www.google.com/maps");
     }
 
-    /**
-     * I implemented a listener here to make the UI dynamic.
-     * If a driver selects "Fuel" or "Tolls", the mileage field is automatically disabled.
-     * This reduces user error and keeps the data clean.
-     */
     private void setupInputs() {
         expenseTypeCombo.setItems(FXCollections.observableArrayList(
                 "Mileage", "Fuel", "Maintenance", "Tolls", "Parking", "Other"
@@ -100,16 +103,16 @@ public class DriverDashboardController {
         });
     }
 
-    public void setDriverEmail(String email) {
+    /**
+     * I updated this method to accept the username and update the UI label immediately.
+     */
+    public void setDriverProfile(String email, String username) {
         this.currentUserEmail = email;
-        welcomeLabel.setText("Driver: " + email);
+        this.currentUsername = username;
+        welcomeLabel.setText("Driver: " + username);
         loadMyHistory();
     }
 
-    /**
-     * Calculates the route using the Google Directions API.
-     * I ensure the API Key is loaded from the secure .env file here.
-     */
     @FXML
     private void calculateRoute() {
         String start = startAddress.getText();
@@ -134,12 +137,10 @@ public class DriverDashboardController {
         double cost = route.miles * RATE_PER_MILE;
         costLabel.setText(String.format("$%.2f", cost));
 
-        // Auto-fill fields for the user
         manualMiles.setText(String.format("%.1f", route.miles));
         manualCost.setText(String.format("%.2f", cost));
         expenseTypeCombo.getSelectionModel().select("Mileage");
 
-        // Load the embedded map
         String apiKey = dotenv.get("GOOGLE_MAPS_API_KEY");
         String mapUrl = "https://www.google.com/maps/embed/v1/directions" +
                 "?key=" + apiKey +
@@ -177,7 +178,10 @@ public class DriverDashboardController {
 
     private void saveExpenseToFirestore(String type, double cost, double miles) {
         Map<String, Object> data = new HashMap<>();
-        data.put("employeeName", currentUserEmail);
+
+        // I use the currentUsername here so the manager sees the name, not the email
+        data.put("employeeName", currentUsername);
+
         data.put("date", LocalDate.now().toString());
         data.put("type", type);
         data.put("amount", cost);
@@ -194,8 +198,10 @@ public class DriverDashboardController {
     private void loadMyHistory() {
         myTrips.clear();
         Firestore db = FirestoreClient.getFirestore();
+
+        // I query using the username to match how we save the data
         ApiFuture<QuerySnapshot> future = db.collection("expenses")
-                .whereEqualTo("employeeName", currentUserEmail)
+                .whereEqualTo("employeeName", currentUsername)
                 .get();
         try {
             List<QueryDocumentSnapshot> docs = future.get().getDocuments();
@@ -210,7 +216,6 @@ public class DriverDashboardController {
 
     @FXML
     private void onLogout(ActionEvent event) {
-        // I make sure to stop the timer to prevent memory leaks when logging out
         SessionManager.stopSessionTimer();
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/login-view.fxml"));

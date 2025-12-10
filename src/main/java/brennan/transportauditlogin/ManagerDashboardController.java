@@ -26,12 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-/**
- * Controller for the Manager Dashboard.
- * I built this to provide real-time auditing capabilities.
- * It includes filtering logic and report generation (PDF/CSV) for administrative use.
- */
 public class ManagerDashboardController {
+
+    @FXML private Label welcomeLabel; // I added this to display the manager's username
 
     @FXML private Label totalCostLabel;
     @FXML private Label pendingCountLabel;
@@ -54,12 +51,19 @@ public class ManagerDashboardController {
     @FXML
     public void initialize() {
         setupTable();
-
-        // I included "Mileage" in the filter list to specifically audit travel claims
         filterType.setItems(FXCollections.observableArrayList("All", "Mileage", "Fuel", "Maintenance", "Tolls", "Other"));
         filterType.getSelectionModel().selectFirst();
-
         loadData();
+    }
+
+    /**
+     * I added this method to update the greeting label.
+     * It is called by the LoginController after a successful login.
+     */
+    public void setManagerName(String username) {
+        if (welcomeLabel != null) {
+            welcomeLabel.setText("Welcome, " + username);
+        }
     }
 
     private void setupTable() {
@@ -69,13 +73,21 @@ public class ManagerDashboardController {
         colAmount.setCellValueFactory(new PropertyValueFactory<>("amount"));
         colMileage.setCellValueFactory(new PropertyValueFactory<>("mileage"));
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
+
+        // Formats Amount Column to show $0.00
+        colAmount.setCellFactory(tc -> new TableCell<Expense, Double>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(String.format("$%.2f", item));
+                }
+            }
+        });
     }
 
-    /**
-     * Data Loading Logic.
-     * I decided to fetch all data from Firestore first and then apply filters locally.
-     * This allows for faster UI updates when the user toggles filters, without hitting the database repeatedly.
-     */
     @FXML
     private void loadData() {
         expenseList.clear();
@@ -94,11 +106,8 @@ public class ManagerDashboardController {
                 Expense expense = doc.toObject(Expense.class);
                 expense.setId(doc.getId());
 
-                // Apply logic to check if expense matches all active filters
                 if (matchesFilters(expense, minMiles)) {
                     expenseList.add(expense);
-
-                    // Update live analytics
                     totalCost += expense.getAmount();
                     totalMiles += expense.getMileage();
                     if ("Pending".equals(expense.getStatus())) {
@@ -133,7 +142,7 @@ public class ManagerDashboardController {
                 return Double.parseDouble(minMileageField.getText());
             }
         } catch (NumberFormatException e) {
-            // Ignore invalid input to prevent crashes
+            // Ignore invalid input
         }
         return 0;
     }
@@ -164,10 +173,8 @@ public class ManagerDashboardController {
         FirestoreClient.getFirestore().collection("expenses").document(selected.getId()).update("status", newStatus);
         selected.setStatus(newStatus);
         expenseTable.refresh();
-        loadData(); // Re-calculate totals after status change
+        loadData();
     }
-
-    // --- Reporting Features ---
 
     @FXML
     private void exportPDF() {
@@ -223,7 +230,6 @@ public class ManagerDashboardController {
 
     @FXML
     private void generateTestData() {
-        // Used for demo purposes
         Firestore db = FirestoreClient.getFirestore();
         java.util.Map<String, Object> data = new HashMap<>();
         data.put("employeeName", "Demo User");
