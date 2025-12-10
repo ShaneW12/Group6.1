@@ -124,6 +124,10 @@ public class LoginController {
             stage.setScene(scene);
             stage.centerOnScreen();
 
+            // --- NEW: START AUTO-LOGOUT TIMER ---
+            SessionManager.startSessionTimer(scene, stage);
+            // ------------------------------------
+
         } catch (IOException e) {
             e.printStackTrace();
             showAlert(Alert.AlertType.ERROR, "Navigation Error", "Could not load the Manager Dashboard.");
@@ -135,14 +139,17 @@ public class LoginController {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/driver-dashboard.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 1000, 700);
 
-            // --- Pass the email to the Driver Controller ---
+            // Pass the email to the Driver Controller
             DriverDashboardController driverController = fxmlLoader.getController();
             driverController.setDriverEmail(email);
-            // -----------------------------------------------
 
             Stage stage = (Stage) emailField.getScene().getWindow();
             stage.setScene(scene);
             stage.centerOnScreen();
+
+            // --- NEW: START AUTO-LOGOUT TIMER ---
+            SessionManager.startSessionTimer(scene, stage);
+            // ------------------------------------
 
         } catch (IOException e) {
             e.printStackTrace();

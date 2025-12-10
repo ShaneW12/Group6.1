@@ -24,7 +24,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 public class ManagerDashboardController {
@@ -35,6 +34,7 @@ public class ManagerDashboardController {
 
     @FXML private DatePicker filterDate;
     @FXML private ComboBox<String> filterType;
+    @FXML private TextField minMileageField; // NEW: Input for minimum mileage
 
     @FXML private TableView<Expense> expenseTable;
     @FXML private TableColumn<Expense, String> colEmployee;
@@ -56,8 +56,8 @@ public class ManagerDashboardController {
         colMileage.setCellValueFactory(new PropertyValueFactory<>("mileage"));
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
 
-        // Setup Filter Options
-        filterType.setItems(FXCollections.observableArrayList("All", "Fuel", "Maintenance", "Tolls", "Other"));
+        // Setup Filter Options - ADDED "Mileage"
+        filterType.setItems(FXCollections.observableArrayList("All", "Mileage", "Fuel", "Maintenance", "Tolls", "Other"));
         filterType.getSelectionModel().selectFirst();
 
         // Load initial data
@@ -69,7 +69,6 @@ public class ManagerDashboardController {
         expenseList.clear();
         Firestore db = FirestoreClient.getFirestore();
 
-        // We get ALL expenses and filter locally (simplifies Firestore indexing)
         ApiFuture<QuerySnapshot> future = db.collection("expenses").get();
 
         try {
@@ -78,9 +77,19 @@ public class ManagerDashboardController {
             double totalMiles = 0;
             int pendingCount = 0;
 
+            // Get Min Mileage Filter Value
+            double minMiles = 0;
+            try {
+                if (!minMileageField.getText().isEmpty()) {
+                    minMiles = Double.parseDouble(minMileageField.getText());
+                }
+            } catch (NumberFormatException e) {
+                // Ignore invalid input, treat as 0
+            }
+
             for (DocumentSnapshot doc : documents) {
                 Expense expense = doc.toObject(Expense.class);
-                expense.setId(doc.getId()); // Store ID for updates
+                expense.setId(doc.getId());
 
                 // --- Apply Filters ---
                 boolean dateMatch = (filterDate.getValue() == null) ||
@@ -89,7 +98,10 @@ public class ManagerDashboardController {
                 boolean typeMatch = filterType.getValue().equals("All") ||
                         (filterType.getValue() != null && filterType.getValue().equals(expense.getType()));
 
-                if (dateMatch && typeMatch) {
+                // NEW: Check if the trip mileage is greater than the filter
+                boolean mileageMatch = expense.getMileage() >= minMiles;
+
+                if (dateMatch && typeMatch && mileageMatch) {
                     expenseList.add(expense);
 
                     // --- Update Widgets ---
@@ -132,16 +144,16 @@ public class ManagerDashboardController {
 
         Firestore db = FirestoreClient.getFirestore();
         try {
-            // Update Firestore
             db.collection("expenses").document(selected.getId()).update("status", newStatus);
-            // Update UI immediately
             selected.setStatus(newStatus);
             expenseTable.refresh();
-            loadData(); // Re-calculate analytics
+            loadData();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
+    // --- Export and Helper Methods remain the same ---
 
     @FXML
     private void exportCSV() {
@@ -182,8 +194,8 @@ public class ManagerDashboardController {
                 document.add(new Paragraph("--------------------------------------------------"));
 
                 for (Expense e : expenseList) {
-                    String line = String.format("Employee: %s | Type: %s | Amount: $%.2f | Status: %s",
-                            e.getEmployeeName(), e.getType(), e.getAmount(), e.getStatus());
+                    String line = String.format("Employee: %s | Type: %s | Amount: $%.2f | Miles: %.1f | Status: %s",
+                            e.getEmployeeName(), e.getType(), e.getAmount(), e.getMileage(), e.getStatus());
                     document.add(new Paragraph(line));
                 }
 
@@ -197,9 +209,8 @@ public class ManagerDashboardController {
 
     @FXML
     private void generateTestData() {
-        // Creates dummy data so you can see the dashboard work
         Firestore db = FirestoreClient.getFirestore();
-        Map<String, Object> data = new HashMap<>();
+        java.util.Map<String, Object> data = new HashMap<>();
         data.put("employeeName", "John Doe");
         data.put("date", java.time.LocalDate.now().toString());
         data.put("type", "Fuel");
@@ -208,18 +219,23 @@ public class ManagerDashboardController {
         data.put("status", "Pending");
 
         db.collection("expenses").add(data);
-        loadData(); // Refresh
+        loadData();
     }
 
     @FXML
     private void resetFilters() {
         filterDate.setValue(null);
         filterType.getSelectionModel().selectFirst();
+        minMileageField.clear(); // Clear the mileage filter
         loadData();
     }
 
     @FXML
     private void onLogout(ActionEvent event) {
+        // --- NEW: Stop the timer to prevent memory leaks ---
+        SessionManager.stopSessionTimer();
+        // --------------------------------------------------
+
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/login-view.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 400, 300);

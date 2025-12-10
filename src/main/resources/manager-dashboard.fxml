@@ -7,6 +7,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -41,6 +42,7 @@
             <HBox spacing="10" alignment="CENTER_LEFT">
                 <DatePicker fx:id="filterDate" promptText="Filter by Date"/>
                 <ComboBox fx:id="filterType" promptText="Expense Type" />
+                <TextField fx:id="minMileageField" promptText="Min Miles" prefWidth="80"/>
                 <Button text="Apply Filters" onAction="#loadData"/>
                 <Button text="Reset" onAction="#resetFilters"/>
                 <Button text="Generate Test Data" onAction="#generateTestData" style="-fx-background-color: #ddd;"/>
