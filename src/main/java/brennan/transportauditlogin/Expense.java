@@ -36,40 +36,20 @@ public class Expense {
         return employeeName;
     }
 
-    public void setEmployeeName(String employeeName) {
-        this.employeeName = employeeName;
-    }
-
     public String getDate() {
         return date;
-    }
-
-    public void setDate(String date) {
-        this.date = date;
     }
 
     public String getType() {
         return type;
     }
 
-    public void setType(String type) {
-        this.type = type;
-    }
-
     public double getAmount() {
         return amount;
     }
 
-    public void setAmount(double amount) {
-        this.amount = amount;
-    }
-
     public double getMileage() {
         return mileage;
-    }
-
-    public void setMileage(double mileage) {
-        this.mileage = mileage;
     }
 
     public String getStatus() {

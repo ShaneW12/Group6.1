@@ -24,6 +24,7 @@
             </Label>
             <HBox HBox.hgrow="ALWAYS" alignment="CENTER_RIGHT">
                 <Label fx:id="welcomeLabel" text="Welcome, Driver" textFill="#cccccc"/>
+                <Button text="Help" onAction="#showHelp" style="-fx-background-color: transparent; -fx-text-fill: white; -fx-border-color: white; -fx-border-radius: 3;"/>
                 <Button text="Logout" onAction="#onLogout" style="-fx-background-color: transparent; -fx-text-fill: white; -fx-underline: true;"/>
             </HBox>
         </HBox>

@@ -8,6 +8,7 @@
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
@@ -18,6 +19,10 @@
             <HBox alignment="CENTER_LEFT" spacing="20">
                 <Label text="Manager Dashboard" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
                 <Label fx:id="welcomeLabel" text="Welcome, Manager" textFill="#555555" style="-fx-font-size: 16px;"/>
+
+                <Pane HBox.hgrow="ALWAYS" />
+
+                <Button text="Help / FAQ" onAction="#showHelp"/>
             </HBox>
 
             <HBox spacing="20">

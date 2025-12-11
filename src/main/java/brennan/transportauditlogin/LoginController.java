@@ -20,9 +20,12 @@ import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -36,6 +39,11 @@ import java.util.Map;
  */
 public class LoginController {
 
+    // I added the logger here to replace the "printStackTrace" calls.
+    // This removes the warnings and is better for debugging.
+    private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
+
+    // Loads the API keys from the .env file so they aren't hardcoded in the code
     private static final Dotenv dotenv = Dotenv.load();
     private static final String FIREBASE_WEB_API_KEY = dotenv.get("FIREBASE_API_KEY");
 
@@ -45,14 +53,26 @@ public class LoginController {
     @FXML private TextField emailField;
     @FXML private PasswordField passwordField;
 
+    // This runs when the login screen first opens
     public void initialize() {
         try {
-            String imagePath = getClass().getResource("/taxi.jpg").toExternalForm();
-            Image image = new Image(imagePath);
-            BackgroundSize backgroundSize = new BackgroundSize(100, 100, true, true, true, true);
-            BackgroundImage backgroundImage = new BackgroundImage(image, BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT, BackgroundPosition.CENTER, backgroundSize);
-            rootPane.setBackground(new Background(backgroundImage));
+            // I added a check here to make sure "rootPane" actually exists before I try to use it.
+            // This fixes the "field never assigned" warning.
+            if (rootPane != null) {
+                // I also added a check for the image file. If "/taxi.jpg" is missing,
+                // it won't crash the app anymore (fixes the NullPointerException warning).
+                URL imageResource = getClass().getResource("/taxi.jpg");
+
+                if (imageResource != null) {
+                    String imagePath = imageResource.toExternalForm();
+                    Image image = new Image(imagePath);
+                    BackgroundSize backgroundSize = new BackgroundSize(100, 100, true, true, true, true);
+                    BackgroundImage backgroundImage = new BackgroundImage(image, BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT, BackgroundPosition.CENTER, backgroundSize);
+                    rootPane.setBackground(new Background(backgroundImage));
+                }
+            }
         } catch (Exception e) {
+            // If the background fails to load, I just log it and move on. The app still works.
             System.err.println("Warning: Could not load background image.");
         }
     }
@@ -68,23 +88,23 @@ public class LoginController {
         }
 
         try {
-            // 1. Verify Password via REST
+            // 1. Verify Password via REST API because the Admin SDK doesn't check passwords
             if (!verifyPassword(email, password)) {
                 showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid email or password.");
                 passwordField.clear();
                 return;
             }
 
-            // 2. Fetch User Record to get the Username
+            // 2. Get the User Record to find their username
             UserRecord userRecord = FirebaseAuth.getInstance().getUserByEmail(email);
             String username = userRecord.getDisplayName();
 
-            // Fallback: If no username was saved, use the email
+            // Fallback: If no username is set, just use the email
             if (username == null || username.isEmpty()) {
                 username = email;
             }
 
-            // 3. Fetch Role from Firestore
+            // 3. Check Firestore to see if they are a "Manager" or "Driver"
             Firestore db = FirestoreClient.getFirestore();
             ApiFuture<DocumentSnapshot> future = db.collection("users").document(userRecord.getUid()).get();
             DocumentSnapshot document = future.get();
@@ -94,21 +114,23 @@ public class LoginController {
                 role = document.getString("role");
             }
 
-            // 4. Route User (Passing the username)
+            // 4. Send them to the correct dashboard based on their role
             if ("Manager".equalsIgnoreCase(role)) {
                 openManagerDashboard(username);
             } else {
-                openDriverDashboard(email, username);
+                // I removed the email parameter here because we don't need it anymore.
+                openDriverDashboard(username);
             }
 
         } catch (FirebaseAuthException e) {
             showAlert(Alert.AlertType.ERROR, "Login Failed", "User not found or database error.");
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Login system error", e); // Fixed warning by using logger
             showAlert(Alert.AlertType.ERROR, "System Error", "An unexpected error occurred.");
         }
     }
 
+    // Helper method to check the password with Firebase
     private boolean verifyPassword(String email, String password) throws IOException, InterruptedException {
         Map<String, Object> payload = new HashMap<>();
         payload.put("email", email);
@@ -133,7 +155,7 @@ public class LoginController {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/manager-dashboard.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 900, 600);
 
-            // I pass the username here so the label can be updated immediately
+            // Pass the username to the manager controller so it says "Welcome, [Name]"
             ManagerDashboardController managerController = fxmlLoader.getController();
             managerController.setManagerName(username);
 
@@ -142,25 +164,27 @@ public class LoginController {
             stage.centerOnScreen();
             SessionManager.startSessionTimer(scene, stage);
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Failed to open Manager Dashboard", e); // Fixed warning
         }
     }
 
-    private void openDriverDashboard(String email, String username) {
+    // I removed the 'email' parameter from this method to fix the "unused parameter" warning
+    private void openDriverDashboard(String username) {
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/driver-dashboard.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), 1000, 700);
 
-            // Passing both email (for ID) and username (for display)
             DriverDashboardController driverController = fxmlLoader.getController();
-            driverController.setDriverProfile(email, username);
+
+            // I only pass the username now, which matches the update I made to the Driver Controller
+            driverController.setDriverProfile(username);
 
             Stage stage = (Stage) emailField.getScene().getWindow();
             stage.setScene(scene);
             stage.centerOnScreen();
             SessionManager.startSessionTimer(scene, stage);
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Failed to open Driver Dashboard", e); // Fixed warning
         }
     }
 
@@ -172,7 +196,7 @@ public class LoginController {
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
             stage.setScene(scene);
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Failed to open Register View", e); // Fixed warning
         }
     }
 
@@ -191,7 +215,7 @@ public class LoginController {
                 showAlert(Alert.AlertType.ERROR, "Error", "Could not send reset email. Check address.");
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Forgot Password error", e); // Fixed warning
             showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred.");
         }
     }
